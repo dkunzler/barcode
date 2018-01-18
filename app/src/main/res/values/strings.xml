@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Essential Barcode Scanner</string>
+    <string name="permission_camera_rationale">Camera is needed for capturing Barcodes</string>
+    <string name="low_storage_error">Your device has low storage, detection is disabled</string>
 </resources>
