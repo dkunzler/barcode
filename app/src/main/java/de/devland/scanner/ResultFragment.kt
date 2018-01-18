@@ -3,6 +3,7 @@ package de.devland.scanner
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.Toolbar
+import android.text.util.Linkify
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +11,8 @@ import android.widget.TextView
 import com.squareup.otto.Subscribe
 import de.devland.scanner.event.BarcodeEvent
 import kotterknife.bindView
+import org.json.JSONException
+import org.json.JSONObject
 
 class ResultFragment : Fragment() {
 
@@ -28,7 +31,17 @@ class ResultFragment : Fragment() {
 
     @Subscribe
     fun onBarcodeEvent(barcodeEvent: BarcodeEvent) {
-        resultText.text = barcodeEvent.barcode.rawValue
+        // try to parse a json object
+        try {
+            val json = JSONObject(barcodeEvent.barcode.rawValue)
+            resultText.text = json.toString(2)
+        } catch (e: JSONException) {
+            // parsing failed, use raw text and Linkify for result
+            resultText.text = barcodeEvent.barcode.rawValue
+            Linkify.addLinks(resultText, Linkify.ALL)
+        }
+
+
     }
 
     override fun onViewCreated(view: View?, savedInstanceState: Bundle?) {

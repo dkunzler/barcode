@@ -68,10 +68,6 @@ class ScanFragment : Fragment() {
         } else {
             requestCameraPermission()
         }
-
-        Snackbar.make(graphicOverlay, "Tap found QR Code to see content",
-                Snackbar.LENGTH_LONG)
-                .show()
     }
 
     private fun requestCameraPermission() {
@@ -201,11 +197,13 @@ class ScanFragment : Fragment() {
 
     @Subscribe
     fun onFragmentSelection(event: FragmentSelectionEvent) {
-        if (event.fragment == FragmentType.SCAN) {
-            startCameraSource()
-        } else {
-            scanPreview.stop()
-        }
+        Thread({
+            if (event.fragment == FragmentType.SCAN) {
+                startCameraSource()
+            } else {
+                scanPreview.stop()
+            }
+        }).start()
     }
 
     /**
