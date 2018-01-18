@@ -8,16 +8,15 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.support.design.widget.Snackbar
 import android.support.v4.app.ActivityCompat
-import android.support.v7.app.AppCompatActivity
+import android.support.v4.app.Fragment
 import android.util.Log
-import android.view.GestureDetector
-import android.view.MotionEvent
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.samples.vision.barcodereader.BarcodeGraphic
-import com.google.android.gms.samples.vision.barcodereader.BarcodeGraphicTracker
 import com.google.android.gms.samples.vision.barcodereader.BarcodeTrackerFactory
 import com.google.android.gms.samples.vision.barcodereader.ui.camera.CameraSourcePreview
 import com.google.android.gms.samples.vision.barcodereader.ui.camera.GraphicOverlay
@@ -25,14 +24,17 @@ import com.google.android.gms.vision.CameraSource
 import com.google.android.gms.vision.MultiProcessor
 import com.google.android.gms.vision.barcode.Barcode
 import com.google.android.gms.vision.barcode.BarcodeDetector
+import com.squareup.otto.Subscribe
+import de.devland.scanner.event.FragmentSelectionEvent
+import de.devland.scanner.event.FragmentType
 import kotterknife.bindView
 import java.io.IOException
 
 
-class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateListener {
+class ScanFragment : Fragment() {
+
     companion object {
-        const val TAG = "ScanActivity"
-        const val EXTRA_BARCODE = "de.devland.barcode.SanActivity.EXTRA_BARCODE"
+        const val TAG = "ScanFragment"
         const val RC_HANDLE_CAMERA_PERM = 2
         const val RC_HANDLE_GMS = 9001
     }
@@ -40,27 +42,34 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
     private var cameraSource: CameraSource? = null
     private val scanPreview: CameraSourcePreview by bindView(R.id.preview)
     private val graphicOverlay: GraphicOverlay<BarcodeGraphic> by bindView(R.id.graphicOverlay)
-
-    private lateinit var gestureDetector: GestureDetector
+    private val topLayout: View by bindView(R.id.topLayout)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_scan)
+        App.mainBus.register(this)
+    }
 
-        val rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+    override fun onDestroyOptionsMenu() {
+        super.onDestroyOptionsMenu()
+        App.mainBus.unregister(this)
+    }
+
+    override fun onCreateView(inflater: LayoutInflater?, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+
+        return inflater!!.inflate(R.layout.fragment_scan, container, false)
+    }
+
+    override fun onViewCreated(view: View?, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        val rc = ActivityCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
         if (rc == PackageManager.PERMISSION_GRANTED) {
             createCameraSource()
         } else {
             requestCameraPermission()
         }
 
-        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-                return onTap(e?.rawX!!, e.rawY) || super.onSingleTapConfirmed(e)
-            }
-        })
-
-        Snackbar.make(graphicOverlay, "Tap to capture",
+        Snackbar.make(graphicOverlay, "Tap found QR Code to see content",
                 Snackbar.LENGTH_LONG)
                 .show()
     }
@@ -70,20 +79,18 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
 
         val permissions = arrayOf(Manifest.permission.CAMERA)
 
-        if (!ActivityCompat.shouldShowRequestPermissionRationale(this,
+        if (!ActivityCompat.shouldShowRequestPermissionRationale(activity,
                 Manifest.permission.CAMERA)) {
-            ActivityCompat.requestPermissions(this, permissions, RC_HANDLE_CAMERA_PERM)
+            ActivityCompat.requestPermissions(activity, permissions, RC_HANDLE_CAMERA_PERM)
             return
         }
 
-        val thisActivity = this
-
         val listener = View.OnClickListener {
-            ActivityCompat.requestPermissions(thisActivity, permissions,
+            ActivityCompat.requestPermissions(activity, permissions,
                     RC_HANDLE_CAMERA_PERM)
         }
 
-        findViewById<View>(R.id.topLayout).setOnClickListener(listener)
+        topLayout.setOnClickListener(listener)
         Snackbar.make(graphicOverlay, R.string.permission_camera_rationale,
                 Snackbar.LENGTH_INDEFINITE)
                 .setAction(android.R.string.ok, listener)
@@ -100,14 +107,14 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
      */
     @SuppressLint("InlinedApi")
     private fun createCameraSource() {
-        val context = applicationContext
+        val context = activity.applicationContext
 
         // A barcode detector is created to track barcodes.  An associated multi-processor instance
         // is set to receive the barcode detection results, track the barcodes, and maintain
         // graphics for each barcode on screen.  The factory is used by the multi-processor to
         // create a separate tracker instance for each barcode.
         val barcodeDetector = BarcodeDetector.Builder(context).build()
-        val barcodeFactory = BarcodeTrackerFactory(graphicOverlay, this)
+        val barcodeFactory = BarcodeTrackerFactory(graphicOverlay, activity)
         barcodeDetector.setProcessor(
                 MultiProcessor.Builder<Barcode>(barcodeFactory).build())
 
@@ -127,10 +134,10 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
             // downloaded, so detection will not become operational.
             @Suppress("DEPRECATION")
             val lowStorageFilter = IntentFilter(Intent.ACTION_DEVICE_STORAGE_LOW)
-            val hasLowStorage = registerReceiver(null, lowStorageFilter) != null
+            val hasLowStorage = activity.registerReceiver(null, lowStorageFilter) != null
 
             if (hasLowStorage) {
-                Toast.makeText(this, R.string.low_storage_error, Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, R.string.low_storage_error, Toast.LENGTH_LONG).show()
                 Log.w(TAG, getString(R.string.low_storage_error))
             }
         }
@@ -138,7 +145,7 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
         // Creates and starts the camera.  Note that this uses a higher resolution in comparison
         // to other detection examples to enable the barcode detector to detect small barcodes
         // at long distances.
-        var builder: CameraSource.Builder = CameraSource.Builder(applicationContext, barcodeDetector)
+        var builder: CameraSource.Builder = CameraSource.Builder(context, barcodeDetector)
                 .setFacing(CameraSource.CAMERA_FACING_BACK)
                 .setRequestedPreviewSize(1600, 1024)
                 .setRequestedFps(15.0f)
@@ -158,10 +165,10 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
     private fun startCameraSource() {
         // check that the device has play services available.
         val code = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(
-                applicationContext)
+                activity.applicationContext)
         if (code != ConnectionResult.SUCCESS) {
             val dlg =
-                    GoogleApiAvailability.getInstance().getErrorDialog(this, code, RC_HANDLE_GMS)
+                    GoogleApiAvailability.getInstance().getErrorDialog(activity, code, RC_HANDLE_GMS)
             dlg.show()
         }
 
@@ -192,6 +199,15 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
         scanPreview.stop()
     }
 
+    @Subscribe
+    fun onFragmentSelection(event: FragmentSelectionEvent) {
+        if (event.fragment == FragmentType.SCAN) {
+            startCameraSource()
+        } else {
+            scanPreview.stop()
+        }
+    }
+
     /**
      * Releases the resources associated with the camera source, the associated detectors, and the
      * rest of the processing pipeline.
@@ -199,57 +215,5 @@ class ScanActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
     override fun onDestroy() {
         super.onDestroy()
         scanPreview.release()
-    }
-
-    override fun onTouchEvent(event: MotionEvent?): Boolean {
-        val handled = gestureDetector.onTouchEvent(event)
-        return handled || super.onTouchEvent(event)
-    }
-
-    /**
-     * onTap returns the tapped barcode result to the calling Activity.
-     *
-     * @param rawX - the raw position of the tap
-     * @param rawY - the raw position of the tap.
-     * @return true if the activity is ending.
-     */
-    private fun onTap(rawX: Float, rawY: Float): Boolean {
-        // Find tap point in preview frame coordinates.
-        val location = IntArray(2)
-        graphicOverlay.getLocationOnScreen(location)
-        val x = (rawX - location[0]) / graphicOverlay.widthScaleFactor
-        val y = (rawY - location[1]) / graphicOverlay.heightScaleFactor
-
-        // Find the barcode whose center is closest to the tapped point.
-        var best: Barcode? = null
-        var bestDistance = java.lang.Float.MAX_VALUE
-        for (graphic in graphicOverlay.graphics) {
-            val barcode = graphic.barcode
-            if (barcode.boundingBox.contains(x.toInt(), y.toInt())) {
-                // Exact hit, no need to keep looking.
-                best = barcode
-                break
-            }
-            val dx = x - barcode.boundingBox.centerX()
-            val dy = y - barcode.boundingBox.centerY()
-            val distance = dx * dx + dy * dy  // actually squared distance
-            if (distance < bestDistance) {
-                best = barcode
-                bestDistance = distance
-            }
-        }
-
-        if (best != null) {
-            val resultIntent = Intent(applicationContext, ResultActivity::class.java)
-            resultIntent.putExtra(EXTRA_BARCODE, best)
-            startActivity(resultIntent)
-            finish()
-            return true
-        }
-        return false
-    }
-
-    override fun onBarcodeDetected(barcode: Barcode?) {
-        // do nothing
     }
 }
