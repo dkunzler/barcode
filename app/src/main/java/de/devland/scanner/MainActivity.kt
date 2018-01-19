@@ -1,5 +1,6 @@
 package de.devland.scanner
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentManager
@@ -14,6 +15,7 @@ import de.devland.scanner.event.FragmentSelectionEvent
 import de.devland.scanner.event.FragmentType
 import kotterknife.bindView
 
+
 class MainActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateListener {
 
     private val viewPager: ViewPager by bindView(R.id.viewPager)
@@ -24,7 +26,7 @@ class MainActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
         App.mainBus.register(this)
 
         viewPager.adapter = PagerAdapter(supportFragmentManager)
-        viewPager.addOnPageChangeListener(object: ViewPager.SimpleOnPageChangeListener() {
+        viewPager.addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
             override fun onPageSelected(position: Int) {
                 var fragment = FragmentType.UNKNOWN
                 when (position) {
@@ -40,6 +42,23 @@ class MainActivity : AppCompatActivity(), BarcodeGraphicTracker.BarcodeUpdateLis
     override fun onDestroy() {
         super.onDestroy()
         App.mainBus.unregister(this)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        when (requestCode) {
+            ScanFragment.RC_HANDLE_CAMERA_PERM -> {
+                // If request is cancelled, the result arrays are empty.
+                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                    // restart activity
+                    val intent = intent
+                    finish()
+                    startActivity(intent)
+                } else {
+                    finish()
+                }
+                return
+            }
+        }
     }
 
     @Subscribe
