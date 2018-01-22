@@ -49,13 +49,7 @@ class ScanFragment : Fragment() {
         App.mainBus.register(this)
     }
 
-    override fun onDestroyOptionsMenu() {
-        super.onDestroyOptionsMenu()
-        App.mainBus.unregister(this)
-    }
-
     override fun onCreateView(inflater: LayoutInflater?, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-
         return inflater!!.inflate(R.layout.fragment_scan, container, false)
     }
 
@@ -213,5 +207,6 @@ class ScanFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         scanPreview.release()
+        App.mainBus.unregister(this)
     }
 }
