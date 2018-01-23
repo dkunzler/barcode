@@ -1,5 +1,6 @@
 package de.devland.scanner
 
+import android.graphics.Typeface
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.Toolbar
@@ -40,13 +41,12 @@ class ResultFragment : Fragment() {
             resultText.text = barcodeEvent.barcode.rawValue
             Linkify.addLinks(resultText, Linkify.ALL)
         }
-
-
     }
 
     override fun onViewCreated(view: View?, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         toolbar.setTitle(R.string.app_name)
+        resultText.typeface = Typeface.createFromAsset(context.assets, "fonts/RobotoSlab-Light.ttf")
     }
 
     override fun onCreateView(inflater: LayoutInflater?, container: ViewGroup?, savedInstanceState: Bundle?): View? {
